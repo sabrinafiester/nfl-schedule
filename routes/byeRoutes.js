@@ -2,43 +2,44 @@ const byeRouter = require('express').Router()
 const db = require("../db.js")
 
 
-byeRouter.get('/season/:season', (req, res) => {
-    const byeSelect = `SELECT week, abbr, city_state, team_name FROM bye_weeks 
-    JOIN teams ON (teams.team_id = bye_weeks.team_id) and (year=season)
-    WHERE season = ? ORDER BY week ASC`;
-    const params = [req.params.season]
-    db.all(byeSelect, params, (err, rows) => {
-        if (err) {
-          throw err;
-        }
-        res.json(rows);
-      });
-});
-
-byeRouter.get('/team/:abbr', (req, res) => {
-    const byeSelect = `SELECT season, week FROM teams 
-    JOIN bye_weeks ON (teams.team_id = bye_weeks.team_id) and (year=season)
-    WHERE abbr = ? ORDER BY season DESC`
-    const params = [req.params.abbr.toUpperCase()];
-    db.all(byeSelect, params, (err, rows) => {
-        if (err) {
-          throw err;
-        }
-        res.json(rows);
-      });
-});
-
 byeRouter.get('/', (req, res) => {
-    const byeSelect = `SELECT week, abbr, city_state, team_name FROM bye_weeks 
-    JOIN teams ON (teams.team_id = bye_weeks.team_id) and (year=season)
-    ORDER BY season DESC`;
-    const params = [req.params.season]
-    db.all(byeSelect, params, (err, rows) => {
+    let byeSelect = `SELECT season, week, abbr, city_state, team_name FROM bye_weeks 
+    JOIN teams ON (teams.team_id = bye_weeks.team_id) and (year=season)`;
+    if(req.query.team && req.query.season) {
+        byeSelect += `WHERE season = ` + req.query.season + ` AND abbr = '` + req.query.team.toUpperCase() + `'`;
+
+    }
+    if(req.query.season) {
+        byeSelect += `WHERE season = ` + req.query.season;
+    }
+    if(req.query.team) {
+        byeSelect += `WHERE abbr = '` + req.query.team.toUpperCase() + `'`;
+    }
+    db.all(byeSelect, (err, rows) => {
         if (err) {
           throw err;
         }
         res.json(rows);
       });
-    });
+});
 
+byeRouter.get('/points', (req, res) => {
+    let period = 'total';
+    if(req.query.period) {
+        period = req.query.period;
+    }
+    const team = req.query.team.toUpperCase();
+    const pointSelect = `SELECT AVG(${period})
+    FROM team_scores
+    JOIN team_games ON team_scores.game_id = team_games.game_id AND team_scores.team_id = team_games.team_id
+    WHERE team_scores.team_id=(SELECT team_id from teams WHERE year=2018 AND abbr='${team}') 
+    AND week > (SELECT week from bye_weeks WHERE team_id=(SELECT team_id from teams WHERE year=2018 AND abbr='${team}') and season=2018)
+    AND season=2018;`
+    db.get(pointSelect, (err, row) => {
+        if(err) {
+            console.log(err.message);
+        }
+        res.json(row);
+      });
+    })
 module.exports = byeRouter
