@@ -17,13 +17,17 @@ byeRouter.get('/', (req, res) => {
     }
     db.all(byeSelect, (err, rows) => {
         if (err) {
-          throw err;
+            console.log(err.message);
         }
         res.json(rows);
       });
 });
 
 byeRouter.get('/points', (req, res) => {
+    if(!req.query.team) {
+        res.json({'message': 'Please specify a team'});
+        return;
+    }
     let period = 'total';
     if(req.query.period) {
         period = req.query.period;
